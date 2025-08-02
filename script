@@ -1,0 +1,105 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- Création GUI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "AutoFarmGUI"
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 120)
+frame.Position = UDim2.new(0, 20, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.2
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Type Soul AutoFarm"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 24
+title.Parent = frame
+
+local autoFarmBtn = Instance.new("TextButton")
+autoFarmBtn.Size = UDim2.new(0.8, 0, 0, 50)
+autoFarmBtn.Position = UDim2.new(0.1, 0, 0, 60)
+autoFarmBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+autoFarmBtn.Text = "AutoFarm (TP + Click + Yes)"
+autoFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoFarmBtn.Font = Enum.Font.SourceSansBold
+autoFarmBtn.TextSize = 22
+autoFarmBtn.Parent = frame
+
+-- Positions
+local tpPosition = Vector3.new(-912, -20.6, 764)
+local clickPosition = Vector3.new(-915.8, -20.6, 761.4)
+
+local function clickNearestClickable(position, radius)
+    local workspace = game:GetService("Workspace")
+    local shortestDist = math.huge
+    local targetObj = nil
+
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj:FindFirstChildOfClass("ClickDetector") then
+            local dist = (obj.Position - position).Magnitude
+            if dist < shortestDist and dist <= radius then
+                shortestDist = dist
+                targetObj = obj
+            end
+        end
+    end
+
+    if targetObj then
+        fireclickdetector(targetObj.ClickDetector)
+        print("Clic effectué sur : "..targetObj.Name)
+        return true
+    else
+        warn("Aucun objet cliquable trouvé à proximité.")
+        return false
+    end
+end
+
+local function clickYesButton()
+    local playerGui = player:WaitForChild("PlayerGui")
+
+    for i = 1, 40 do -- attend jusqu'à 10 secondes (40 x 0.25)
+        for _, gui in ipairs(playerGui:GetChildren()) do
+            for _, obj in ipairs(gui:GetDescendants()) do
+                if obj:IsA("TextButton") and obj.Text == "Yes." then
+                    if obj.Visible and obj.Parent and obj.Parent.Visible then
+                        pcall(function()
+                            obj:Activate()
+                        end)
+                        print("✅ Bouton 'Yes.' cliqué automatiquement.")
+                        return true
+                    end
+                end
+            end
+        end
+        task.wait(0.25)
+    end
+
+    warn("❌ Bouton 'Yes.' non trouvé après 10 secondes.")
+    return false
+end
+
+autoFarmBtn.MouseButton1Click:Connect(function()
+    local character = player.Character or player.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+
+    -- Téléportation
+    hrp.CFrame = CFrame.new(tpPosition)
+    print("Téléporté à la position : ", tpPosition)
+
+    wait(0.5)
+
+    -- Clic sur le panneau
+    if clickNearestClickable(clickPosition, 5) then
+        wait(0.5)
+        -- Clic sur Yes dans la GUI
+        clickYesButton()
+    end
+end)
