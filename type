@@ -1,158 +1,104 @@
--- AutoFarm Type Soul avec GUI
-
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
-local missionBoardName = "MissionBoard"
-local AutoFarmEnabled = false
+local boardName = "MissionBoard"
+local AutoFarm = false
 
--- GUI Setup
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0, 260, 0, 120)
-Frame.Position = UDim2.new(0, 10, 0.5, -60)
-Frame.BackgroundColor3 = Color3.fromRGB(40,40,40)
-Frame.BorderSizePixel = 0
-Frame.Active = true
-Frame.Draggable = true
+-- GUI
+local sg = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+local f = Instance.new("Frame", sg)
+f.Size, f.Position = UDim2.new(0,300,0,140), UDim2.new(0,10,0.4,0)
+f.BackgroundColor3 = Color3.fromRGB(30,30,30)
+f.Active, f.Draggable = true, true
 
-local Label = Instance.new("TextLabel", Frame)
-Label.Size = UDim2.new(1,0,0,30)
-Label.Position = UDim2.new(0,0,0,0)
-Label.Text = "Type Soul AutoFarm"
-Label.TextColor3 = Color3.new(1,1,1)
-Label.BackgroundTransparency = 1
-Label.Font = Enum.Font.GothamBold
-Label.TextScaled = true
+local title = Instance.new("TextLabel", f)
+title.Size, title.BackgroundTransparency = UDim2.new(1,0,0,30) = UDim2.new(1,0,0,30)
+title.Text = "Type Soul AutoFarm"
+title.TextScaled, title.TextColor3 = true, Color3.new(1,1,1)
 
-local function button(text, y, callback)
-    local btn = Instance.new("TextButton", Frame)
-    btn.Size = UDim2.new(0.9,0,0,30)
-    btn.Position = UDim2.new(0.05,0,0,y)
-    btn.Text = text
-    btn.Font = Enum.Font.Gotham
-    btn.TextScaled = true
-    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.MouseButton1Click:Connect(callback)
-    return btn
+local function btn(text, y, cb)
+    local b = Instance.new("TextButton", f)
+    b.Size, b.Position = UDim2.new(0.9,0,0,30), UDim2.new(0.05,0,0,y)
+    b.Text, b.Font, b.TextScaled = text, Enum.Font.GothamBold, true
+    b.BackgroundColor3, b.TextColor3 = Color3.fromRGB(50,50,50), Color3.new(1,1,1)
+    b.MouseButton1Click:Connect(cb)
+    return b
 end
 
--- Téléportation devant le MissionBoard
-local function tpBoard()
-    local board = workspace:FindFirstChild(missionBoardName)
-    if board and board.PrimaryPart then
-        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if root then
-            root.CFrame = board.PrimaryPart.CFrame * CFrame.new(0,0,3)
-            task.wait(0.3)
-            return true
-        end
-    end
-    return false
-end
-
--- Prise de quête avec ClickDetector ou ProximityPrompt
-local function acceptQuest()
-    if not tpBoard() then return false end
-    local board = workspace:FindFirstChild(missionBoardName)
-    for _, v in ipairs(board:GetChildren()) do
-        if v:IsA("ClickDetector") then
-            fireclickdetector(v)
-            task.wait(0.5)
-            break
-        end
-    end
-    local pr = board:FindFirstChildOfClass("ProximityPrompt")
-    if pr and pr.Enabled then
-        pr:InputHoldBegin()
-        task.wait(0.5)
-        pr:InputHoldEnd()
-    end
-
-    -- Attendre l’apparition d’un GUI contenant un bouton "Yes"
-    local gui = LocalPlayer.PlayerGui:FindFirstChildWhichIsA("ScreenGui")
-    if gui then
-        local btn = gui:FindFirstChild("Yes") or gui:FindFirstChildWhichIsA("TextButton")
-        if btn then
-            btn:Fire() -- ou btn:Click()
-            task.wait(0.5)
-        end
-    end
-    return true
-end
-
--- Récupe les ennemis actifs avec 'Enemy' tag
-local function getEnemies()
-    local list = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj:FindFirstChild("Enemy") and obj:FindFirstChild("Humanoid") then
-            if obj.Humanoid.Health > 0 then
-                table.insert(list, obj)
-            end
-        end
-    end
-    return list
-end
-
--- Attaque un ennemi minimalement
-local function attack(enemy)
-    if enemy and enemy:FindFirstChild("HumanoidRootPart") then
-        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        root.CFrame = enemy.HumanoidRootPart.CFrame + Vector3.new(0,5,0)
-        task.wait(0.2)
-        for i=1,2 do
-            VirtualInputManager:SendMouseButtonEvent(500,500,0,true,game,1)
-            task.wait(0.05)
-            VirtualInputManager:SendMouseButtonEvent(500,500,0,false,game,1)
-            task.wait(0.1)
-        end
-    end
-end
-
--- Exécution automatique si l’ennemi est mort (HP ≤ 0)
-local function executeDead(enemies)
-    for _, e in ipairs(enemies) do
-        if e and e:FindFirstChild("Humanoid") and e.Humanoid.Health <= 0 then
-            LocalPlayer.Character:PivotTo(e:GetPivot())
-            task.wait(0.1)
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.B, false, game)
-            task.wait(0.1)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.B, false, game)
-            task.wait(0.3)
-        end
-    end
-end
-
--- Boucle principale
-local function startAutoFarm()
-    while AutoFarmEnabled do
-        if not acceptQuest() then
-            wait(2)
-        else
-            local enemies = getEnemies()
-            while #enemies > 0 do
-                for _, e in ipairs(enemies) do
-                    if e.Humanoid and e.Humanoid.Health > 0 then attack(e) end
+btn("Start AutoFarm", 40, function()
+    AutoFarm = not AutoFarm
+    btn.Text = AutoFarm and "Stop AutoFarm" or "Start AutoFarm"
+    if AutoFarm then task.spawn(function()
+        while AutoFarm do
+            -- 📍 Téléportation devant le mission board
+            local board = workspace:FindFirstChild(boardName)
+            if board and board.PrimaryPart then
+                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    root.CFrame = board.PrimaryPart.CFrame * CFrame.new(0,0,3)
+                    task.wait(0.3)
                 end
-                executeDead(enemies)
-                enemies = getEnemies()
-                task.wait(0.5)
+            else task.wait(2); continue end
+
+            -- 📄 Acceptation automatique de la quête
+            for _,v in ipairs(board:GetChildren()) do
+                if v:IsA("ClickDetector") then
+                    fireclickdetector(v); task.wait(0.5); break
+                end
+            end
+            local pr = board:FindFirstChildOfClass("ProximityPrompt")
+            if pr and pr.Enabled then
+                pr:InputHoldBegin(); task.wait(0.5); pr:InputHoldEnd()
             end
             task.wait(1)
-        end
-    end
-end
 
--- Boutons GUI
-local btnStart = button("Start AutoFarm", 40, function()
-    AutoFarmEnabled = not AutoFarmEnabled
-    btnStart.Text = AutoFarmEnabled and "Stop AutoFarm" or "Start AutoFarm"
-    if AutoFarmEnabled then task.spawn(startAutoFarm) end
+            -- 🪧 Récupération des ennemis, attaque et exécution
+            local enemies = {}
+            for _,npc in ipairs(workspace:GetDescendants()) do
+                if npc:IsA("Model") and npc:FindFirstChild("Enemy") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                    table.insert(enemies, npc)
+                end
+            end
+
+            while #enemies > 0 do
+                for _,e in ipairs(enemies) do
+                    if e:FindFirstChild("HumanoidRootPart") then
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = e.HumanoidRootPart.CFrame + Vector3.new(0,5,0)
+                        task.wait(0.2)
+                        for i=1,2 do
+                            VirtualInputManager:SendMouseButtonEvent(500,500,0,true,game,1)
+                            task.wait(0.05)
+                            VirtualInputManager:SendMouseButtonEvent(500,500,0,false,game,1)
+                        end
+                    end
+                end
+                task.wait(0.5)
+                -- exécute les ennemis morts
+                for _,e in ipairs(enemies) do
+                    if e.Humanoid.Health <= 0 then
+                        LocalPlayer.Character:PivotTo(e:GetPivot())
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(true,Enum.KeyCode.B,false,game)
+                        task.wait(0.05)
+                        VirtualInputManager:SendKeyEvent(false,Enum.KeyCode.B,false,game)
+                        task.wait(0.3)
+                    end
+                end
+                -- refresh
+                enemies = {}
+                for _,npc in ipairs(workspace:GetDescendants()) do
+                    if npc:IsA("Model") and npc:FindFirstChild("Enemy") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                        table.insert(enemies, npc)
+                    end
+                end
+            end
+
+            task.wait(1)
+        end
+    end) end
 end)
 
-button("Stop All", 80, function()
-    AutoFarmEnabled = false
-    btnStart.Text = "Start AutoFarm"
+btn("Stop All", 90, function()
+    AutoFarm = false
 end)
