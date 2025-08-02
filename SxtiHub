@@ -1,27 +1,30 @@
--- GUI complet Type Soul avec fond personnalisé
--- Auteur : ChatGPT + image utilisateur
--- Image utilisée : personnage aux yeux rouges (fond stylé)
+-- Type Soul GUI - AutoFarm + AutoExecute + ESP + Fly personnalisé
+-- Fly remplacé par script externe via loadstring()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
--- 🖼️ GUI Setup
+getgenv().AutoFarm = false
+getgenv().AutoExecute = false
+getgenv().Fly = false
+
+local KilledTargets = {}
+
+-- 🖼️ GUI
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
 ScreenGui.Name = "TypeSoulAutofarmGUI"
 
 local Background = Instance.new("ImageLabel", ScreenGui)
 Background.Size = UDim2.new(0, 300, 0, 400)
-Background.Position = UDim2.new(0.5, -150, 0.5, -200)
-Background.Image = "rbxassetid://17164673956" -- Image convertie par l'utilisateur
+Background.Position = UDim2.new(0, 20, 0.5, -200)
+Background.Image = "rbxassetid://17164673956"
 Background.BackgroundTransparency = 1
 Background.ScaleType = Enum.ScaleType.Crop
 Background.ClipsDescendants = true
 
--- 💡 Bouton création helper
-function createButton(name, posY, callback)
+local function createButton(name, posY, callback)
     local btn = Instance.new("TextButton", Background)
     btn.Size = UDim2.new(0.8, 0, 0, 30)
     btn.Position = UDim2.new(0.1, 0, 0, posY)
@@ -33,98 +36,107 @@ function createButton(name, posY, callback)
     btn.MouseButton1Click:Connect(callback)
 end
 
--- 🔁 AutoFarm + Quête
-getgenv().AutoFarm = false
+-- ▶ AutoFarm
 createButton("▶ AutoFarm", 10, function()
     getgenv().AutoFarm = not getgenv().AutoFarm
-    while getgenv().AutoFarm do
-        task.wait(0.5)
-        pcall(function()
-            -- Prendre la quête
-            local questGiver = workspace:FindFirstChild("QuestGiver")
-            if questGiver then
-                fireproximityprompt(questGiver:FindFirstChildOfClass("ProximityPrompt"))
-            end
-            -- Chercher un ennemi
-            local closest
-            for _,v in pairs(workspace:GetDescendants()) do
-                if v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Enemy") then
-                    closest = v
-                    break
+    if getgenv().AutoFarm then
+        while getgenv().AutoFarm do
+            task.wait(0.5)
+            pcall(function()
+                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not root then return end
+
+                for _, prompt in ipairs(workspace:GetDescendants()) do
+                    if prompt:IsA("ProximityPrompt") and prompt.Enabled and prompt.MaxActivationDistance then
+                        local pos = (prompt.Parent.Position or prompt.Parent:GetPivot().Position)
+                        if (pos - root.Position).Magnitude <= prompt.MaxActivationDistance then
+                            root.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
+                            task.wait(0.2)
+                            fireproximityprompt(prompt)
+                            task.wait(0.5)
+                            break
+                        end
+                    end
                 end
-            end
-            if closest then
-                local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                local enemyRoot = closest:FindFirstChild("HumanoidRootPart")
-                if root and enemyRoot then
-                    root.CFrame = enemyRoot.CFrame + Vector3.new(0, 8, 0) -- Fly au-dessus
+
+                local closest, minDist = nil, math.huge
+                for _, v in ipairs(workspace:GetDescendants()) do
+                    if v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v:FindFirstChild("Enemy") then
+                        local dist = (v.HumanoidRootPart.Position - root.Position).Magnitude
+                        if dist < minDist then
+                            closest = v
+                            minDist = dist
+                        end
+                    end
+                end
+
+                if closest and root then
+                    KilledTargets[closest] = true
+                    root.CFrame = closest.HumanoidRootPart.CFrame + Vector3.new(0, 8, 0)
                     task.wait(0.1)
-                    -- Taper avec reach augmentée
                     for _ = 1, 2 do
                         VirtualInputManager:SendMouseButtonEvent(500, 500, 0, true, game, 1)
                         task.wait(0.05)
                         VirtualInputManager:SendMouseButtonEvent(500, 500, 0, false, game, 1)
                     end
                 end
-            end
-        end)
-    end
-end)
-
--- 💀 Auto Execute KO
-getgenv().AutoExecute = false
-createButton("💀 AutoExecute", 50, function()
-    getgenv().AutoExecute = not getgenv().AutoExecute
-    while getgenv().AutoExecute do
-        task.wait(0.2)
-        for _,v in ipairs(workspace:GetDescendants()) do
-            if v:FindFirstChild("Humanoid") and v.Humanoid.Health <= 10 then
-                pcall(function()
-                    LocalPlayer.Character:PivotTo(v:GetPivot())
-                    task.wait(0.1)
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.B, false, game)
-                    task.wait(0.05)
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.B, false, game)
-                end)
-            end
+            end)
         end
     end
 end)
 
--- ✈️ Fly au-dessus des mobs
-getgenv().Fly = false
-createButton("☁ Safe Fly", 90, function()
+-- 💀 AutoExecute ciblé
+createButton("💀 AutoExecute", 50, function()
+    getgenv().AutoExecute = not getgenv().AutoExecute
+    if getgenv().AutoExecute then
+        while getgenv().AutoExecute do
+            task.wait(0.2)
+            pcall(function()
+                for _, v in ipairs(workspace:GetDescendants()) do
+                    if v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") and v.Humanoid.Health <= 10 and KilledTargets[v] then
+                        LocalPlayer.Character:PivotTo(v:GetPivot())
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.B, false, game)
+                        task.wait(0.05)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.B, false, game)
+                        KilledTargets[v] = nil
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ✈️ Fly remplacé par script externe (ArcEmu / GitHub)
+createButton("☁ Custom Fly", 90, function()
     getgenv().Fly = not getgenv().Fly
     if getgenv().Fly then
-        print("Flying Enabled")
-        RunService:BindToRenderStep("Flying", Enum.RenderPriority.Character.Value, function()
-            pcall(function()
-                LocalPlayer.Character.Humanoid:ChangeState(11)
-                LocalPlayer.Character:TranslateBy(Vector3.new(0, 0.6, 0))
-            end)
-        end)
-    else
-        RunService:UnbindFromRenderStep("Flying")
+        loadstring(game:HttpGet(('https://gist.githubusercontent.com/meozoneYT/bf037dff9f0a70017304ddd67fdcd370/raw/e14e74f425b060df523343cf30b787074eb3c5d2/arceus%2520x%2520fly%25202%2520obflucator'), true))()
     end
 end)
 
 -- 🧠 ESP Joueurs
 createButton("🧺 ESP Joueurs", 130, function()
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and not player.Character:FindFirstChild("ESP") then
-            local head = player.Character:FindFirstChild("Head")
-            if head then
-                local billboard = Instance.new("BillboardGui", player.Character)
-                billboard.Name = "ESP"
-                billboard.Size = UDim2.new(0, 100, 0, 20)
-                billboard.Adornee = head
-                billboard.AlwaysOnTop = true
-                local label = Instance.new("TextLabel", billboard)
-                label.Size = UDim2.new(1, 0, 1, 0)
-                label.Text = player.Name
-                label.BackgroundTransparency = 1
-                label.TextColor3 = Color3.new(1, 0, 0)
-                label.TextScaled = true
+        if player ~= LocalPlayer and player.Character then
+            local existing = player.Character:FindFirstChild("ESP")
+            if existing then
+                existing:Destroy()
+            else
+                local head = player.Character:FindFirstChild("Head")
+                if head then
+                    local billboard = Instance.new("BillboardGui", player.Character)
+                    billboard.Name = "ESP"
+                    billboard.Size = UDim2.new(0, 100, 0, 20)
+                    billboard.Adornee = head
+                    billboard.AlwaysOnTop = true
+                    local label = Instance.new("TextLabel", billboard)
+                    label.Size = UDim2.new(1, 0, 1, 0)
+                    label.Text = player.Name
+                    label.BackgroundTransparency = 1
+                    label.TextColor3 = Color3.new(1, 0, 0)
+                    label.TextScaled = true
+                end
             end
         end
     end
@@ -135,5 +147,5 @@ createButton("❌ Stop All", 170, function()
     getgenv().AutoFarm = false
     getgenv().AutoExecute = false
     getgenv().Fly = false
-    RunService:UnbindFromRenderStep("Flying")
+    RunService:UnbindFromRenderStep("TypeSoulFly")
 end)
