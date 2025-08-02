@@ -1,0 +1,203 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- Création GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoFarmGUI"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 120)
+frame.Position = UDim2.new(0, 20, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.2
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Type Soul AutoFarm"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 24
+title.Parent = frame
+
+local autoFarmBtn = Instance.new("TextButton")
+autoFarmBtn.Size = UDim2.new(0.8, 0, 0, 50)
+autoFarmBtn.Position = UDim2.new(0.1, 0, 0, 60)
+autoFarmBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+autoFarmBtn.Text = "AutoFarm (Fly + Click + Yes)"
+autoFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoFarmBtn.Font = Enum.Font.SourceSansBold
+autoFarmBtn.TextSize = 22
+autoFarmBtn.Parent = frame
+
+-- Positions
+local tpPosition = Vector3.new(-912, -20.6, 764)
+local clickPosition = Vector3.new(-915.8, -20.6, 761.4)
+
+-- Variables Fly
+local flying = false
+local flySpeed = 2 -- vitesse x2
+local bodyGyro, bodyVelocity
+local noClipConnection
+
+local function noClip()
+    local character = player.Character
+    if not character then return end
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+end
+
+local function startFly(destination)
+    if flying then return end
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = character.HumanoidRootPart
+
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.P = 9e4
+    bodyGyro.maxTorque = Vector3.new(9e5, 9e5, 9e5)
+    bodyGyro.cframe = hrp.CFrame
+    bodyGyro.Parent = hrp
+
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.velocity = Vector3.new(0,0,0)
+    bodyVelocity.maxForce = Vector3.new(9e5, 9e5, 9e5)
+    bodyVelocity.Parent = hrp
+
+    flying = true
+
+    -- NoClip permanent pendant le vol
+    noClipConnection = RunService.Stepped:Connect(function()
+        noClip()
+    end)
+
+    -- Vol automatique vers la destination
+    spawn(function()
+        while flying do
+            wait(0.03)
+            local hrpPos = hrp.Position
+            local direction = (destination - hrpPos)
+            local distance = direction.Magnitude
+            if distance < 2 then -- Arrivé proche de la destination
+                flying = false
+                break
+            end
+            local moveDirection = direction.Unit * flySpeed
+            bodyVelocity.velocity = moveDirection
+            bodyGyro.cframe = CFrame.new(hrpPos, destination)
+        end
+
+        -- Arrêt vol
+        stopFly()
+    end)
+end
+
+function stopFly()
+    flying = false
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    if noClipConnection then
+        noClipConnection:Disconnect()
+        noClipConnection = nil
+    end
+
+    -- Remet les collisions normales
+    local character = player.Character
+    if character then
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+local function clickNearestClickable(position, radius)
+    local workspace = game:GetService("Workspace")
+    local shortestDist = math.huge
+    local targetObj = nil
+
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj:FindFirstChildOfClass("ClickDetector") then
+            local dist = (obj.Position - position).Magnitude
+            if dist < shortestDist and dist <= radius then
+                shortestDist = dist
+                targetObj = obj
+            end
+        end
+    end
+
+    if targetObj then
+        fireclickdetector(targetObj.ClickDetector)
+        print("Clic effectué sur : "..targetObj.Name)
+        return true
+    else
+        warn("Aucun objet cliquable trouvé à proximité.")
+        return false
+    end
+end
+
+local function clickYesButton()
+    local playerGui = player:WaitForChild("PlayerGui")
+    -- Le nom exact de la GUI peut varier, adapte si besoin
+    local missionGui = nil
+    for i=1, 10 do
+        missionGui = playerGui:FindFirstChild("MissionBoard") or playerGui:FindFirstChild("MissionGui") or playerGui:FindFirstChildWhichIsA("ScreenGui")
+        if missionGui then break end
+        wait(0.5)
+    end
+    if missionGui then
+        local yesBtn = nil
+        for _, obj in pairs(missionGui:GetDescendants()) do
+            if obj:IsA("TextButton") and obj.Text == "Yes." then
+                yesBtn = obj
+                break
+            end
+        end
+        if yesBtn then
+            yesBtn:Activate()
+            print("Bouton Yes cliqué automatiquement.")
+            return true
+        else
+            warn("Bouton Yes non trouvé.")
+            return false
+        end
+    else
+        warn("GUI de mission non trouvée.")
+        return false
+    end
+end
+
+autoFarmBtn.MouseButton1Click:Connect(function()
+    local character = player.Character or player.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+
+    -- Start fly vers la position tpPosition
+    startFly(tpPosition)
+
+    -- Attendre la fin du vol (le flag flying sera mis à false dans startFly)
+    while flying do wait(0.1) end
+
+    wait(0.5)
+
+    -- Clic sur le panneau proche clickPosition
+    if clickNearestClickable(clickPosition, 5) then
+        wait(0.5)
+        -- Clic sur bouton Yes.
+        clickYesButton()
+    end
+end)
