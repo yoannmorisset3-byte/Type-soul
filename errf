@@ -1,10 +1,9 @@
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
--- Création GUI
-local screenGui = Instance.new("ScreenGui")
+-- Création du GUI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "AutoFarmGUI"
-screenGui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 300, 0, 120)
@@ -34,81 +33,61 @@ autoFarmBtn.Font = Enum.Font.SourceSansBold
 autoFarmBtn.TextSize = 22
 autoFarmBtn.Parent = frame
 
--- Positions
+-- Coordonnées
 local tpPosition = Vector3.new(-912, -20.6, 764)
 local clickPosition = Vector3.new(-915.8, -20.6, 761.4)
 
+-- Fonction pour cliquer sur un ClickDetector proche
 local function clickNearestClickable(position, radius)
-    local workspace = game:GetService("Workspace")
-    local shortestDist = math.huge
-    local targetObj = nil
-
-    for _, obj in pairs(workspace:GetDescendants()) do
+    for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj:FindFirstChildOfClass("ClickDetector") then
             local dist = (obj.Position - position).Magnitude
-            if dist < shortestDist and dist <= radius then
-                shortestDist = dist
-                targetObj = obj
+            if dist <= radius then
+                fireclickdetector(obj:FindFirstChildOfClass("ClickDetector"))
+                print("Click détecté sur :", obj.Name)
+                return true
             end
         end
     end
-
-    if targetObj then
-        fireclickdetector(targetObj.ClickDetector)
-        print("Clic effectué sur : "..targetObj.Name)
-        return true
-    else
-        warn("Aucun objet cliquable trouvé à proximité.")
-        return false
-    end
+    warn("Aucun ClickDetector trouvé à proximité.")
+    return false
 end
 
+-- Fonction pour cliquer sur le bouton "Yes"
 local function clickYesButton()
     local playerGui = player:WaitForChild("PlayerGui")
-    -- Le nom exact de la GUI peut varier, adapte si besoin
-    local missionGui = nil
-    for i=1, 10 do
-        missionGui = playerGui:FindFirstChild("MissionBoard") or playerGui:FindFirstChild("MissionGui") or playerGui:FindFirstChildWhichIsA("ScreenGui")
-        if missionGui then break end
-        wait(0.5)
-    end
-    if missionGui then
-        local yesBtn = nil
-        for _, obj in pairs(missionGui:GetDescendants()) do
-            if obj:IsA("TextButton") and obj.Text:lower():find("yes") then
-                yesBtn = obj
-                break
+    for i = 1, 20 do
+        for _, gui in ipairs(playerGui:GetChildren()) do
+            for _, obj in ipairs(gui:GetDescendants()) do
+                if obj:IsA("TextButton") and obj.Text:lower():find("yes") then
+                    obj:Activate()
+                    print("Bouton 'Yes' cliqué.")
+                    return true
+                end
             end
         end
-        if yesBtn then
-            yesBtn:Activate()
-            print("Bouton Yes cliqué automatiquement.")
-            return true
-        else
-            warn("Bouton Yes non trouvé.")
-            return false
-        end
-    else
-        warn("GUI de mission non trouvée.")
-        return false
+        wait(0.25)
     end
+    warn("Bouton 'Yes' introuvable.")
+    return false
 end
 
+-- Quand on clique sur le bouton
 autoFarmBtn.MouseButton1Click:Connect(function()
-    local character = player.Character or player.CharacterAdded:Wait()
-    local hrp = character:WaitForChild("HumanoidRootPart")
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
 
     -- Téléportation
     hrp.CFrame = CFrame.new(tpPosition)
-    print("Téléporté à la position : ", tpPosition)
+    print("Téléporté à :", tpPosition)
 
+    -- Attente
     wait(0.5)
 
-    -- Clic sur le panneau
-    if clickNearestClickable(clickPosition, 5) then
+    -- Clic sur tableau
+    if clickNearestClickable(clickPosition, 6) then
         wait(0.5)
-        -- Clic sur Yes dans la GUI
+        -- Clic sur "Yes"
         clickYesButton()
     end
 end)
-
