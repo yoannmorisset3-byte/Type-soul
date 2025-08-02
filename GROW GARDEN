@@ -1,0 +1,106 @@
+-- 🌱 Grow a Garden - Script GUI Complet
+-- 📌 Créé par ChatGPT pour un usage éducatif ou privé uniquement
+
+local plr = game.Players.LocalPlayer
+local gui = Instance.new("ScreenGui", plr:WaitForChild("PlayerGui"))
+gui.Name = "GardenScriptUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 300, 0, 400)
+frame.Position = UDim2.new(0.5, -150, 0.5, -200)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BorderSizePixel = 0
+
+local uilist = Instance.new("UIListLayout", frame)
+uilist.Padding = UDim.new(0, 10)
+uilist.FillDirection = Enum.FillDirection.Vertical
+uilist.HorizontalAlignment = Enum.HorizontalAlignment.Center
+uilist.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local function addButton(text, callback)
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0, 280, 0, 40)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BackgroundColor3 = Color3.fromRGB(0, 120, 50)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 20
+    btn.MouseButton1Click:Connect(callback)
+end
+
+-- AutoFarm
+local autofarm = false
+addButton("🌾 Toggle Auto-Farm", function()
+    autofarm = not autofarm
+    while autofarm do
+        local garden = workspace:FindFirstChild("GardenPlots")
+        if garden then
+            local myPlot = garden:FindFirstChild(plr.Name)
+            if myPlot then
+                for _, plot in pairs(myPlot:GetChildren()) do
+                    if plot:FindFirstChild("Plant") and plot.Plant:FindFirstChild("ClickDetector") then
+                        fireclickdetector(plot.Plant.ClickDetector)
+                    elseif plot:FindFirstChild("ClickDetector") then
+                        fireclickdetector(plot.ClickDetector)
+                    end
+                    task.wait(0.2)
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- Auto-Mutation
+local automutate = false
+addButton("🧬 Toggle Auto-Mutation", function()
+    automutate = not automutate
+    while automutate do
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v.Name:lower():find("mutate") and v:IsA("ClickDetector") then
+                fireclickdetector(v)
+            end
+        end
+        task.wait(2)
+    end
+end)
+
+-- Speed Boost
+addButton("⚡ Boost Vitesse", function()
+    plr.Character.Humanoid.WalkSpeed = 100
+end)
+
+-- No Cooldown (spam clics)
+addButton("🔥 No Cooldown (Click Spam)", function()
+    for _, v in pairs(getgc(true)) do
+        if typeof(v) == "function" and islclosure(v) and not is_synapse_function(v) then
+            debug.setupvalue(v, 1, 0)
+        end
+    end
+end)
+
+-- Anti-AFK
+addButton("🛡️ Anti-AFK", function()
+    for _, conn in pairs(getconnections(plr.Idled)) do
+        conn:Disable()
+    end
+end)
+
+-- Téléportations utiles
+local function tpTo(name)
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj.Name:lower():find(name:lower()) and obj:IsA("BasePart") then
+            plr.Character:MoveTo(obj.Position + Vector3.new(0, 5, 0))
+            return
+        end
+    end
+end
+
+addButton("🌸 TP Lilac", function() tpTo("lilac") end)
+addButton("🌙 TP Celestial", function() tpTo("celestial") end)
+addButton("🍄 TP Polinated", function() tpTo("polinated") end)
+
+-- Fermer le GUI
+addButton("❌ Fermer GUI", function()
+    gui:Destroy()
+end)
