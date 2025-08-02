@@ -1,0 +1,64 @@
+local flySpeed = 2 -- vitesse de vol x2
+
+-- Chargement du script distant
+local remoteScript = loadstring(game:HttpGet("https://raw.githubusercontent.com/yoannmorisset3-byte/Type-soul/refs/heads/main/EZERE"))()
+
+-- Exemple pour modifier la vitesse de vol après chargement,
+-- ça dépend si le script distant expose une variable ou fonction pour ça
+-- Sinon, tu peux injecter/modifier directement dans le script distant si tu peux l’éditer.
+
+-- Exemple fictif : si le script distant crée une table Fly avec vitesse
+if remoteScript and type(remoteScript) == "table" and remoteScript.Fly then
+    remoteScript.Fly.Speed = flySpeed
+end
+
+-- Sinon, si tu veux un script fly simple avec vitesse 2 intégré, voici un petit fly basique:
+
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+local flying = false
+local speed = flySpeed
+
+local bodyGyro
+local bodyVelocity
+
+function startFly()
+    if flying then return end
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+
+    local hrp = character.HumanoidRootPart
+
+    bodyGyro = Instance.new("BodyGyro", hrp)
+    bodyGyro.P = 9e4
+    bodyGyro.maxTorque = Vector3.new(9e5, 9e5, 9e5)
+    bodyGyro.cframe = hrp.CFrame
+
+    bodyVelocity = Instance.new("BodyVelocity", hrp)
+    bodyVelocity.velocity = Vector3.new(0,0,0)
+    bodyVelocity.maxForce = Vector3.new(9e5, 9e5, 9e5)
+
+    flying = true
+
+    spawn(function()
+        while flying do
+            wait()
+            local moveDirection = Vector3.new()
+            if mouse.KeyDown:wait() == "w" then
+                moveDirection = moveDirection + (workspace.CurrentCamera.CFrame.LookVector * speed)
+            elseif mouse.KeyDown:wait() == "s" then
+                moveDirection = moveDirection - (workspace.CurrentCamera.CFrame.LookVector * speed)
+            end
+            bodyVelocity.velocity = moveDirection
+            bodyGyro.cframe = workspace.CurrentCamera.CFrame
+        end
+    end)
+end
+
+function stopFly()
+    flying = false
+    if bodyGyro then bodyGyro:Destroy() end
+    if bodyVelocity then bodyVelocity:Destroy() end
+end
+
+-- Tu peux appeler startFly() pour démarrer le vol avec vitesse x2
