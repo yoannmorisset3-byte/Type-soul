@@ -1,8 +1,6 @@
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
-local mouse = player:GetMouse()
 
--- Création GUI
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "AutoFarmGUI"
 
@@ -31,15 +29,14 @@ autoFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 autoFarmBtn.Font = Enum.Font.SourceSansBold
 autoFarmBtn.TextSize = 20
 
--- Position à téléporter
-local targetPosition = Vector3.new(500, 0, 500)
+local targetPosition = Vector3.new(-912.0, -20.6, 764.0)
 
 autoFarmBtn.MouseButton1Click:Connect(function()
     local character = player.Character or player.CharacterAdded:Wait()
     local hrp = character:FindFirstChild("HumanoidRootPart")
     if hrp then
         hrp.CFrame = CFrame.new(targetPosition)
-        print("Téléporté à la position mission : ", targetPosition)
+        print("Téléporté à la position : ", targetPosition)
     else
         warn("HumanoidRootPart non trouvé")
     end
