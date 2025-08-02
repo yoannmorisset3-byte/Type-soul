@@ -1,252 +1,148 @@
--- GUI complet Type Soul avec auto quête tableau + améliorations + god mode
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+-local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
--- Variables
-local questBoardName = "MissionBoard" -- NOM EXACT DU TABLEAU DANS LE JEU
-local KilledTargets = {}
-local CurrentQuestEnemies = {}
-local AutoFarmEnabled = false
-local AutoExecuteEnabled = false
-local GodModeEnabled = false
+local missionBoardName = "MissionBoard"
 
--- GUI Setup
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "TypeSoulAutofarmGUI"
-
-local Background = Instance.new("ImageLabel", ScreenGui)
-Background.Size = UDim2.new(0, 300, 0, 400)
-Background.Position = UDim2.new(0, 10, 0.5, -200)
-Background.Image = "rbxassetid://17164673956"
-Background.BackgroundTransparency = 1
-Background.ScaleType = Enum.ScaleType.Crop
-Background.ClipsDescendants = true
-
-local buttons = {}
-
-local function createButton(name, posY, callback)
-    local btn = Instance.new("TextButton", Background)
-    btn.Size = UDim2.new(0.8, 0, 0, 30)
-    btn.Position = UDim2.new(0.1, 0, 0, posY)
-    btn.Text = name
-    btn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextScaled = true
-    btn.MouseButton1Click:Connect(callback)
-    buttons[name] = btn
-    return btn
-end
-
-local function teleportToQuestBoard()
-    local questBoard = workspace:FindFirstChild(questBoardName)
-    if questBoard and questBoard.PrimaryPart then
+-- Fonction pour TP devant le mission board
+local function tpToMissionBoard()
+    local board = workspace:FindFirstChild(missionBoardName)
+    if board and board.PrimaryPart then
         local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if root then
-            root.CFrame = questBoard.PrimaryPart.CFrame * CFrame.new(0, 0, 3)
+            root.CFrame = board.PrimaryPart.CFrame * CFrame.new(0, 0, 3)
             task.wait(0.3)
-        end
-        return true
-    else
-        warn("Tableau de quête introuvable")
-        return false
-    end
-end
-
-local function takeQuest()
-    local questBoard = workspace:FindFirstChild(questBoardName)
-    if not questBoard then
-        warn("Tableau de quête introuvable : " .. questBoardName)
-        return false
-    end
-
-    -- Téléportation devant le tableau
-    if not teleportToQuestBoard() then return false end
-
-    for _, child in pairs(questBoard:GetChildren()) do
-        if child:IsA("ClickDetector") then
-            fireclickdetector(child)
-            task.wait(0.5)
             return true
         end
     end
-
-    local prompt = questBoard:FindFirstChildOfClass("ProximityPrompt")
-    if prompt and prompt.Enabled then
-        fireproximityprompt(prompt)
-        task.wait(0.5)
-        return true
-    end
-
-    warn("Aucun ClickDetector ou ProximityPrompt trouvé sur le tableau")
     return false
 end
 
+-- Fonction pour prendre une quête (cliquer sur tableau puis "Yes" dans GUI)
+local function takeQuest()
+    local board = workspace:FindFirstChild(missionBoardName)
+    if not board then
+        warn("MissionBoard non trouvé.")
+        return false
+    end
+
+    -- Cliquer sur ClickDetector ou ProximityPrompt
+    for _, child in ipairs(board:GetChildren()) do
+        if child:IsA("ClickDetector") then
+            fireclickdetector(child)
+            task.wait(0.5)
+            break
+        end
+    end
+
+    local prompt = board:FindFirstChildOfClass("ProximityPrompt")
+    if prompt and prompt.Enabled then
+        prompt:InputHoldBegin()
+        task.wait(0.5)
+        prompt:InputHoldEnd()
+    end
+
+    -- Attendre la GUI de quête (exemple: un ScreenGui dans PlayerGui avec bouton "Yes")
+    local questGui = nil
+    local maxWait = 5
+    local timer = 0
+    while timer < maxWait do
+        questGui = LocalPlayer.PlayerGui:FindFirstChild("QuestGui") -- Nom à vérifier dans le jeu
+        if questGui then
+            local yesButton = questGui:FindFirstChild("YesButton") -- Nom du bouton "Yes" à vérifier
+            if yesButton and yesButton:IsA("TextButton") and yesButton.Visible then
+                yesButton.MouseButton1Click:Invoke() -- simuler clic (parfois click() marche)
+                task.wait(0.5)
+                return true
+            end
+        end
+        task.wait(0.5)
+        timer = timer + 0.5
+    end
+
+    warn("Bouton Yes introuvable dans la GUI")
+    return false
+end
+
+-- Récupérer les ennemis vivants
 local function getQuestEnemies()
-    CurrentQuestEnemies = {}
-    local character = LocalPlayer.Character
-    if not character then return end
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    for _, npc in pairs(workspace:GetDescendants()) do
+    local enemies = {}
+    for _, npc in ipairs(workspace:GetDescendants()) do
         if npc:IsA("Model") and npc:FindFirstChild("Humanoid") and npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Enemy") then
-            local dist = (npc.HumanoidRootPart.Position - root.Position).Magnitude
-            if dist < 200 then -- On considère que les ennemis liés à la quête sont proches du joueur
-                table.insert(CurrentQuestEnemies, npc)
+            if npc.Humanoid.Health > 0 then
+                table.insert(enemies, npc)
+            end
+        end
+    end
+    return enemies
+end
+
+-- Attaquer un ennemi
+local function attackEnemy(enemy)
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if root and enemy and enemy:FindFirstChild("HumanoidRootPart") then
+        root.CFrame = enemy.HumanoidRootPart.CFrame + Vector3.new(0, 8, 0)
+        task.wait(0.1)
+        for _=1, 2 do
+            VirtualInputManager:SendMouseButtonEvent(500, 500, 0, true, game, 1)
+            task.wait(0.05)
+            VirtualInputManager:SendMouseButtonEvent(500, 500, 0, false, game, 1)
+        end
+    end
+end
+
+-- Exécuter les ennemis morts (touche B)
+local function executeEnemies()
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    for _, enemy in ipairs(workspace:GetDescendants()) do
+        if enemy:IsA("Model") and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health <= 0 then
+            if enemy:FindFirstChild("HumanoidRootPart") then
+                LocalPlayer.Character:PivotTo(enemy:GetPivot())
+                task.wait(0.1)
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.B, false, game)
+                task.wait(0.05)
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.B, false, game)
+                task.wait(0.3)
             end
         end
     end
 end
 
-local function moveToTarget(target)
-    local character = LocalPlayer.Character
-    if not character then return false end
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if not root or not target or not target:FindFirstChild("HumanoidRootPart") then return false end
-    root.CFrame = target.HumanoidRootPart.CFrame + Vector3.new(0,8,0)
-    return true
-end
+-- Boucle principale autofarm
+local AutoFarm = true
 
-local function attackTarget()
-    for _=1,2 do
-        VirtualInputManager:SendMouseButtonEvent(500, 500, 0, true, game, 1)
-        task.wait(0.05)
-        VirtualInputManager:SendMouseButtonEvent(500, 500, 0, false, game, 1)
-    end
-end
+spawn(function()
+    while AutoFarm do
+        if not tpToMissionBoard() then
+            warn("Impossible de TP au mission board.")
+            task.wait(3)
+            continue
+        end
 
-local function autoFarm()
-    while AutoFarmEnabled do
-        task.wait(0.3)
-        pcall(function()
-            if not takeQuest() then return end
-            getQuestEnemies()
+        if not takeQuest() then
+            warn("Impossible de prendre la quête.")
+            task.wait(3)
+            continue
+        end
 
-            for _, enemy in ipairs(CurrentQuestEnemies) do
+        task.wait(1)
+
+        local enemies = getQuestEnemies()
+        while #enemies > 0 do
+            for _, enemy in ipairs(enemies) do
                 if enemy and enemy.Parent and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
-                    moveToTarget(enemy)
-                    attackTarget()
-                    task.wait(0.1)
+                    attackEnemy(enemy)
+                    task.wait(0.2)
                 end
             end
-        end)
-    end
-end
-
-local function autoExecute()
-    while AutoExecuteEnabled do
-        task.wait(0.2)
-        for _, enemy in pairs(CurrentQuestEnemies) do
-            if enemy and enemy.Parent and enemy:FindFirstChild("Humanoid") then
-                if enemy.Humanoid.Health <= 10 then
-                    pcall(function()
-                        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                            LocalPlayer.Character:PivotTo(enemy:GetPivot())
-                            task.wait(0.1)
-                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.B, false, game)
-                            task.wait(0.05)
-                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.B, false, game)
-                        end
-                    end)
-                end
-            end
+            enemies = getQuestEnemies()
         end
-    end
-end
 
--- God Mode
-local function enableGodMode()
-    local character = LocalPlayer.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        humanoid.MaxHealth = math.huge
-        humanoid.Health = math.huge
-        humanoid.HealthChanged:Connect(function()
-            if GodModeEnabled then
-                humanoid.Health = humanoid.MaxHealth
-            end
-        end)
+        executeEnemies()
+        task.wait(1)
     end
-end
-
--- Buttons
-createButton("▶ AutoFarm", 10, function()
-    AutoFarmEnabled = not AutoFarmEnabled
-    if AutoFarmEnabled then
-        spawn(autoFarm)
-        buttons["▶ AutoFarm"].Text = "⏸ AutoFarm"
-    else
-        buttons["▶ AutoFarm"].Text = "▶ AutoFarm"
-    end
-end)
-
-createButton("💀 AutoExecute", 50, function()
-    AutoExecuteEnabled = not AutoExecuteEnabled
-    if AutoExecuteEnabled then
-        spawn(autoExecute)
-        buttons["💀 AutoExecute"].Text = "⏸ AutoExecute"
-    else
-        buttons["💀 AutoExecute"].Text = "💀 AutoExecute"
-    end
-end)
-
-createButton("👹 God Mode", 90, function()
-    GodModeEnabled = not GodModeEnabled
-    if GodModeEnabled then
-        enableGodMode()
-        buttons["👹 God Mode"].Text = "✅ God Mode ON"
-    else
-        buttons["👹 God Mode"].Text = "👹 God Mode"
-    end
-end)
-
-local flyButton = createButton("☁ Safe Fly", 130, function()
-    getgenv().Fly = not getgenv().Fly
-    if getgenv().Fly then
-        flyButton.Text = "Sxti"
-        print("Flying Enabled")
-        loadstring(game:HttpGet("https://gist.githubusercontent.com/meozoneYT/bf037dff9f0a70017304ddd67fdcd370/raw/e14e74f425b060df523343cf30b787074eb3c5d2/arceus%20x%20fly%202%20obfuscator"))()
-    else
-        flyButton.Text = "☁ Safe Fly"
-        print("Flying Disabled")
-    end
-end)
-
-createButton("🧺 ESP Joueurs", 170, function()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and not player.Character:FindFirstChild("ESP") then
-            local head = player.Character:FindFirstChild("Head")
-            if head then
-                local billboard = Instance.new("BillboardGui", player.Character)
-                billboard.Name = "ESP"
-                billboard.Size = UDim2.new(0, 100, 0, 20)
-                billboard.Adornee = head
-                billboard.AlwaysOnTop = true
-                local label = Instance.new("TextLabel", billboard)
-                label.Size = UDim2.new(1, 0, 1, 0)
-                label.Text = player.Name
-                label.BackgroundTransparency = 1
-                label.TextColor3 = Color3.new(1, 0, 0)
-                label.TextScaled = true
-            end
-        end
-    end
-end)
-
-createButton("❌ Stop All", 210, function()
-    AutoFarmEnabled = false
-    AutoExecuteEnabled = false
-    GodModeEnabled = false
-    getgenv().Fly = false
-    flyButton.Text = "☁ Safe Fly"
-    buttons["▶ AutoFarm"].Text = "▶ AutoFarm"
-    buttons["💀 AutoExecute"].Text = "💀 AutoExecute"
-    buttons["👹 God Mode"].Text = "👹 God Mode"
 end)
 
