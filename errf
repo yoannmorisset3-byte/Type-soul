@@ -41,3 +41,4 @@ autoFarmBtn.MouseButton1Click:Connect(function()
         warn("HumanoidRootPart non trouvé")
     end
 end)
+
