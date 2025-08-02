@@ -2,80 +2,171 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
 local autofarmEnabled = false
-local guiOpen = false
+local guiOpen = true
 
-local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-screenGui.Name = "AutoFarmGUI"
+-- GUI principale
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TypeSoulGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- Bouton image Ouvrir/Fermer (toujours visible)
-local toggleMainBtn = Instance.new("ImageButton", screenGui)
-toggleMainBtn.Size = UDim2.new(0, 60, 0, 60)
-toggleMainBtn.Position = UDim2.new(0, 20, 0.7, 0)
-toggleMainBtn.BackgroundTransparency = 1
-toggleMainBtn.Image = "rbxassetid://0" -- placeholder, on va changer après
-
--- Charge ton image depuis fichier local (uploadé)
-local imagePath = "/mnt/data/6de78e52-4a95-4bcc-8b74-cb89b330fda8.png"
--- Impossible d'utiliser chemin local directement dans Roblox, il faut la mettre en ligne sur Roblox ou sur un hébergeur et récupérer l'AssetId
-
--- Pour l'instant, tu dois uploader cette image sur Roblox et remplacer ici l'ID de l'image, par exemple :
-toggleMainBtn.Image = "rbxassetid://TonAssetIdIci"
-
-local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 732, 0, 400)
-frame.Position = UDim2.new(0, 20, 0.7, -400)
+-- Fenêtre principale
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 732, 0, 732)
+frame.Position = UDim2.new(0, 20, 0.7, -732)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
-frame.BackgroundTransparency = 0.2
-frame.Visible = false
+frame.BackgroundTransparency = 0.1
+frame.Parent = screenGui
 
-local closeBtn = Instance.new("TextButton", frame)
+-- Bouton de fermeture (X)
+local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 40, 0, 30)
-closeBtn.Position = UDim2.new(1, -45, 0, 10)
+closeBtn.Position = UDim2.new(1, -90, 0, 10)
 closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
 closeBtn.Text = "X"
 closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBtn.Font = Enum.Font.SourceSansBold
 closeBtn.TextSize = 22
+closeBtn.Parent = frame
 
-local title = Instance.new("TextLabel", frame)
+-- Bouton de réduction (-)
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 40, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -45, 0, 10)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+minimizeBtn.Text = "-"
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.Font = Enum.Font.SourceSansBold
+minimizeBtn.TextSize = 22
+minimizeBtn.Parent = frame
+
+-- Titre
+local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -60, 0, 50)
 title.Position = UDim2.new(0, 10, 0, 10)
 title.BackgroundTransparency = 1
-title.Text = "AutoFarm Type Soul"
+title.Text = "Type Soul Utility"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.SourceSansBold
 title.TextSize = 36
 title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frame
 
-local statusLabel = Instance.new("TextLabel", frame)
+-- Icône réduite
+local minimizedBtn = Instance.new("ImageButton")
+minimizedBtn.Size = UDim2.new(0, 60, 0, 60)
+minimizedBtn.Position = UDim2.new(0, 20, 0.7, 0)
+minimizedBtn.BackgroundTransparency = 1
+minimizedBtn.Image = "rbxassetid://0" -- Remplace par ton AssetId Roblox
+minimizedBtn.Visible = false
+minimizedBtn.Parent = screenGui
+
+-- Ouvrir depuis icône réduite
+minimizedBtn.MouseButton1Click:Connect(function()
+    frame.Visible = true
+    minimizedBtn.Visible = false
+end)
+
+-- Réduire
+minimizeBtn.MouseButton1Click:Connect(function()
+    frame.Visible = false
+    minimizedBtn.Visible = true
+end)
+
+-- Fermer
+closeBtn.MouseButton1Click:Connect(function()
+    frame.Visible = false
+    minimizedBtn.Visible = true
+end)
+
+-- === Onglets ===
+local tabButtons = {}
+local currentTab = nil
+local tabContent = {}
+
+local function createTab(name, index)
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0, 120, 0, 40)
+    btn.Position = UDim2.new(0, 10 + (index - 1) * 130, 0, 70)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 22
+    btn.Text = name
+    btn.Parent = frame
+
+    local contentFrame = Instance.new("Frame", frame)
+    contentFrame.Size = UDim2.new(1, -20, 1, -130)
+    contentFrame.Position = UDim2.new(0, 10, 0, 120)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.Visible = false
+    contentFrame.Parent = frame
+
+    btn.MouseButton1Click:Connect(function()
+        if currentTab then
+            tabContent[currentTab].Visible = false
+        end
+        currentTab = name
+        tabContent[currentTab].Visible = true
+    end)
+
+    tabButtons[name] = btn
+    tabContent[name] = contentFrame
+end
+
+-- Onglets : AutoFarm & ESP
+createTab("AutoFarm", 1)
+createTab("ESP", 2)
+
+-- Contenu AutoFarm
+local autoFarmFrame = tabContent["AutoFarm"]
+
+local statusLabel = Instance.new("TextLabel")
 statusLabel.Size = UDim2.new(1, -20, 0, 40)
-statusLabel.Position = UDim2.new(0, 10, 0, 70)
+statusLabel.Position = UDim2.new(0, 10, 0, 10)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Text = "Status: OFF"
 statusLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
 statusLabel.Font = Enum.Font.SourceSans
 statusLabel.TextSize = 28
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.Parent = autoFarmFrame
 
-local toggleBtn = Instance.new("TextButton", frame)
+local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(0.6, 0, 0, 60)
-toggleBtn.Position = UDim2.new(0.2, 0, 0, 130)
+toggleBtn.Position = UDim2.new(0.2, 0, 0, 60)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
 toggleBtn.Text = "Activer AutoFarm"
 toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.Font = Enum.Font.SourceSansBold
 toggleBtn.TextSize = 28
+toggleBtn.Parent = autoFarmFrame
 
+-- (Tu peux rajouter plus d'options ici)
+
+-- Contenu ESP
+local espFrame = tabContent["ESP"]
+
+local espLabel = Instance.new("TextLabel")
+espLabel.Size = UDim2.new(1, -20, 0, 40)
+espLabel.Position = UDim2.new(0, 10, 0, 10)
+espLabel.BackgroundTransparency = 1
+espLabel.Text = "ESP options ici (à compléter)"
+espLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+espLabel.Font = Enum.Font.SourceSans
+espLabel.TextSize = 28
+espLabel.TextXAlignment = Enum.TextXAlignment.Left
+espLabel.Parent = espFrame
+
+-- === AutoFarm logique ===
 local NORMAL_RANGE = 30
 local RANGE = NORMAL_RANGE * 3
 
 local function getNearestEnemy()
     local nearestEnemy = nil
     local nearestDistance = math.huge
-
     if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return nil end
-
     for _, npc in pairs(workspace:FindFirstChild("Enemies") and workspace.Enemies:GetChildren() or {}) do
         if npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 and npc:FindFirstChild("HumanoidRootPart") then
             local dist = (npc.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
@@ -85,7 +176,6 @@ local function getNearestEnemy()
             end
         end
     end
-
     return nearestEnemy
 end
 
@@ -113,22 +203,6 @@ local function stopAutoFarm()
     autofarmEnabled = false
 end
 
-toggleMainBtn.MouseButton1Click:Connect(function()
-    guiOpen = not guiOpen
-    frame.Visible = guiOpen
-    if guiOpen then
-        toggleMainBtn.ImageTransparency = 0.5
-    else
-        toggleMainBtn.ImageTransparency = 0
-    end
-end)
-
-closeBtn.MouseButton1Click:Connect(function()
-    guiOpen = false
-    frame.Visible = false
-    toggleMainBtn.ImageTransparency = 0
-end)
-
 toggleBtn.MouseButton1Click:Connect(function()
     autofarmEnabled = not autofarmEnabled
     if autofarmEnabled then
@@ -142,5 +216,4 @@ toggleBtn.MouseButton1Click:Connect(function()
         toggleBtn.Text = "Activer AutoFarm"
         stopAutoFarm()
     end
-end)  SAUVGARDE SA
-
+end)
