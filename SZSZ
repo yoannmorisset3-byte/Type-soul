@@ -1,0 +1,154 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- Création GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoFarmGUI"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 140)
+frame.Position = UDim2.new(0, 20, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.2
+frame.BorderSizePixel = 0
+frame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Type Soul AutoFarm"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 24
+title.Parent = frame
+
+local autoFarmBtn = Instance.new("TextButton")
+autoFarmBtn.Size = UDim2.new(0.8, 0, 0, 50)
+autoFarmBtn.Position = UDim2.new(0.1, 0, 0, 70)
+autoFarmBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 255)
+autoFarmBtn.Text = "AutoFarm (Vol + Click + Yes)"
+autoFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoFarmBtn.Font = Enum.Font.SourceSansBold
+autoFarmBtn.TextSize = 22
+autoFarmBtn.Parent = frame
+
+local tpPosition = Vector3.new(-912, -20.6, 764)
+local clickPosition = Vector3.new(-915.8, -20.6, 761.4)
+
+local flying = false
+
+local function flyToPosition(pos, speed)
+    local character = player.Character
+    if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    flying = true
+
+    local connection
+    connection = RunService.Heartbeat:Connect(function(deltaTime)
+        if not flying then
+            connection:Disconnect()
+            return
+        end
+        local currentPos = hrp.Position
+        local direction = (pos - currentPos)
+        local distance = direction.Magnitude
+        if distance < 1 then
+            flying = false
+            connection:Disconnect()
+            return
+        end
+        local moveVector = direction.Unit * speed * deltaTime * 60
+        if moveVector.Magnitude > distance then
+            hrp.CFrame = CFrame.new(pos)
+        else
+            hrp.CFrame = hrp.CFrame + moveVector
+        end
+    end)
+end
+
+local function clickNearestClickable(position, radius)
+    local workspace = game:GetService("Workspace")
+    local shortestDist = math.huge
+    local targetObj = nil
+
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj:FindFirstChildOfClass("ClickDetector") then
+            local dist = (obj.Position - position).Magnitude
+            if dist < shortestDist and dist <= radius then
+                shortestDist = dist
+                targetObj = obj
+            end
+        end
+    end
+
+    if targetObj then
+        fireclickdetector(targetObj.ClickDetector)
+        print("Clic effectué sur : "..targetObj.Name)
+        return true
+    else
+        warn("Aucun objet cliquable trouvé à proximité.")
+        return false
+    end
+end
+
+local function clickYesButton()
+    local playerGui = player:WaitForChild("PlayerGui")
+    -- Le nom exact de la GUI peut varier, adapte si besoin
+    local missionGui = nil
+    for i=1, 10 do
+        missionGui = playerGui:FindFirstChild("MissionBoard") or playerGui:FindFirstChild("MissionGui") or playerGui:FindFirstChildWhichIsA("ScreenGui")
+        if missionGui then break end
+        wait(0.5)
+    end
+    if missionGui then
+        local yesBtn = nil
+        for _, obj in pairs(missionGui:GetDescendants()) do
+            if obj:IsA("TextButton") and obj.Text == "Yes." then
+                yesBtn = obj
+                break
+            end
+        end
+        if yesBtn then
+            yesBtn:Activate()
+            print("Bouton Yes cliqué automatiquement.")
+            return true
+        else
+            warn("Bouton Yes non trouvé.")
+            return false
+        end
+    else
+        warn("GUI de mission non trouvée.")
+        return false
+    end
+end
+
+autoFarmBtn.MouseButton1Click:Connect(function()
+    if flying then
+        print("Déjà en vol...")
+        return
+    end
+
+    flyToPosition(tpPosition, 2)
+
+    -- On attend la fin du vol (simple attente active)
+    -- Pour faire ça propre, on boucle et check "flying" 
+    local startTime = tick()
+    while flying and tick() - startTime < 30 do
+        task.wait(0.1)
+    end
+
+    if not flying then
+        wait(0.5)
+        if clickNearestClickable(clickPosition, 5) then
+            wait(0.5)
+            clickYesButton()
+        end
+    else
+        warn("Le vol a duré trop longtemps, abandon.")
+    end
+end)
