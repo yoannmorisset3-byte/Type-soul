@@ -1,0 +1,157 @@
+-- Réinitialiser la caméra au lancement
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local function resetCamera()
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    camera.CameraSubject = humanoid
+    camera.CameraType = Enum.CameraType.Custom
+end
+
+resetCamera()
+
+-- Fly exactement jusqu'à une position (juste après reset caméra)
+local function flyToPosition(position)
+    local character = player.Character or player.CharacterAdded:Wait()
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+    local bodyPosition = Instance.new("BodyPosition")
+    bodyPosition.Position = position
+    bodyPosition.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bodyPosition.P = 1e5
+    bodyPosition.D = 1e3
+    bodyPosition.Parent = rootPart
+
+    repeat task.wait() until (rootPart.Position - position).Magnitude < 0.1
+    bodyPosition:Destroy()
+    print("Fly terminé. Position exacte atteinte.")
+end
+
+flyToPosition(Vector3.new(-915.8, -20.6, 761.4))
+
+-- Charger les scripts distants
+loadstring(game:HttpGet("https://raw.githubusercontent.com/yoannmorisset3-byte/Type-soul/refs/heads/main/zizi"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/yoannmorisset3-byte/Type-soul/refs/heads/main/abcd"))()
+
+-- Clique sur un ClickDetector proche d'une position donnée
+local function clickAtPosition(position, radius)
+    local workspace = game:GetService("Workspace")
+    local closestPart = nil
+    local closestDistance = math.huge
+
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj:FindFirstChildOfClass("ClickDetector") then
+            local dist = (obj.Position - position).Magnitude
+            if dist < closestDistance and dist <= radius then
+                closestDistance = dist
+                closestPart = obj
+            end
+        end
+    end
+
+    if closestPart then
+        fireclickdetector(closestPart.ClickDetector)
+        print("Clic effectué sur : " .. closestPart.Name)
+        return true
+    else
+        warn("Aucun objet cliquable trouvé proche de la position donnée.")
+        return false
+    end
+end
+
+-- Clique automatiquement sur le bouton "Yes." d'une GUI
+local function clickYesButton()
+    local playerGui = player:WaitForChild("PlayerGui")
+    local gui = nil
+
+    for i = 1, 10 do
+        for _, screenGui in pairs(playerGui:GetChildren()) do
+            if screenGui:IsA("ScreenGui") then
+                for _, obj in pairs(screenGui:GetDescendants()) do
+                    if obj:IsA("TextButton") and obj.Text == "Yes." then
+                        gui = obj
+                        break
+                    end
+                end
+            end
+            if gui then break end
+        end
+        if gui then break end
+        wait(0.5)
+    end
+
+    if gui then
+        gui:Activate()
+        print("Bouton 'Yes.' cliqué automatiquement.")
+        return true
+    else
+        warn("Bouton 'Yes.' non trouvé.")
+        return false
+    end
+end
+
+-- Execution initiale : clique + bouton Yes
+if clickAtPosition(Vector3.new(-915.8, -20.6, 761.4), 5) then
+    wait(0.5)
+    clickYesButton()
+end
+
+-- Attendre 4 secondes
+task.wait(4)
+
+-- Agrandir la reach ×5
+local function expandReach(multiplier)
+    local character = player.Character or player.CharacterAdded:Wait()
+    for _, obj in pairs(character:GetDescendants()) do
+        if obj:IsA("Tool") and obj:FindFirstChild("Handle") then
+            obj.Handle.Size = obj.Handle.Size * multiplier
+            obj.Handle.Massless = true
+            obj.Handle.CanCollide = false
+            print("Reach étendue x" .. multiplier)
+        end
+    end
+end
+
+expandReach(5)
+
+-- Détection de fin de quête par texte "Quest Complete"
+local function monitorQuestCompletion()
+    local playerGui = player:WaitForChild("PlayerGui")
+    while true do
+        task.wait(0.5)
+        for _, gui in pairs(playerGui:GetDescendants()) do
+            if gui:IsA("TextLabel") or gui:IsA("TextButton") then
+                if string.find(gui.Text, "Quest Complete") then
+                    print("Quête terminée détectée.")
+                    return true
+                end
+            end
+        end
+    end
+end
+
+-- Auto punch loop
+local function autoPunchUntilQuestDone()
+    local character = player.Character or player.CharacterAdded:Wait()
+    local tool = character:FindFirstChildOfClass("Tool")
+    if not tool then
+        warn("Aucun outil trouvé pour punch.")
+        return
+    end
+
+    local questDone = false
+
+    coroutine.wrap(function()
+        questDone = monitorQuestCompletion()
+    end)()
+
+    while not questDone do
+        tool:Activate()
+        task.wait(0.1)
+    end
+
+    print("Auto punch arrêté car quête finie.")
+end
+
+autoPunchUntilQuestDone()
