@@ -1,0 +1,80 @@
+-- Réinitialiser la caméra au lancement
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+local function resetCamera()
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+
+    camera.CameraSubject = humanoid
+    camera.CameraType = Enum.CameraType.Custom
+end
+
+resetCamera()
+
+-- Charger le script distant
+loadstring(game:HttpGet("https://raw.githubusercontent.com/yoannmorisset3-byte/Type-soul/refs/heads/main/abcd"))()
+
+local function clickAtPosition(position, radius)
+    local workspace = game:GetService("Workspace")
+    local closestPart = nil
+    local closestDistance = math.huge
+
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj:FindFirstChildOfClass("ClickDetector") then
+            local dist = (obj.Position - position).Magnitude
+            if dist < closestDistance and dist <= radius then
+                closestDistance = dist
+                closestPart = obj
+            end
+        end
+    end
+
+    if closestPart then
+        fireclickdetector(closestPart.ClickDetector)
+        print("Clic effectué sur : "..closestPart.Name)
+        return true
+    else
+        warn("Aucun objet cliquable trouvé proche de la position donnée.")
+        return false
+    end
+end
+
+local function clickYesButton()
+    local playerGui = player:WaitForChild("PlayerGui")
+
+    -- Attendre que la GUI apparaisse (max 10 essais, 0.5 sec d'intervalle)
+    local gui = nil
+    for i = 1, 10 do
+        -- On cherche une GUI contenant un bouton texte "Yes."
+        for _, screenGui in pairs(playerGui:GetChildren()) do
+            if screenGui:IsA("ScreenGui") then
+                for _, obj in pairs(screenGui:GetDescendants()) do
+                    if obj:IsA("TextButton") and obj.Text == "Yes." then
+                        gui = obj
+                        break
+                    end
+                end
+            end
+            if gui then break end
+        end
+        if gui then break end
+        wait(0.5)
+    end
+
+    if gui then
+        gui:Activate() -- ou gui:Click() selon version Roblox
+        print("Bouton 'Yes.' cliqué automatiquement.")
+        return true
+    else
+        warn("Bouton 'Yes.' non trouvé.")
+        return false
+    end
+end
+
+-- Exécution
+if clickAtPosition(Vector3.new(-915.8, -20.6, 761.4), 5) then
+    wait(0.5) -- attendre un peu que la GUI apparaisse
+    clickYesButton()
+end
